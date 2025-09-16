@@ -17,6 +17,8 @@ export default function UsersList() {
   const [paginationMode, setPaginationMode] = useState<
     "infinite" | "pagination"
   >("infinite");
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [refetchInterval, setRefetchInterval] = useState<number | false>(false);
 
   // Infinite query for infinite scroll mode
   const infiniteQuery = useInfiniteQuery({
@@ -29,9 +31,11 @@ export default function UsersList() {
     initialPageParam: 0,
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    enabled: paginationMode === "infinite", // Only run when in infinite mode
+    refetchOnWindowFocus: true, // Enable refetch on window focus
+    refetchOnMount: true, // Enable refetch on mount
+    refetchInterval: refetchInterval, // Automatic background refetching
+    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    enabled: paginationMode === "infinite",
   });
 
   // Regular query for pagination mode
@@ -40,9 +44,11 @@ export default function UsersList() {
     queryFn: () => fetchUsers(10, currentPage * 10),
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    enabled: paginationMode === "pagination", // Only run when in pagination mode
+    refetchOnWindowFocus: true, // Enable refetch on window focus
+    refetchOnMount: true, // Enable refetch on mount
+    refetchInterval: refetchInterval, // Automatic background refetching
+    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    enabled: paginationMode === "pagination",
   });
 
   // Use the appropriate query based on mode
@@ -57,15 +63,75 @@ export default function UsersList() {
     mutationKey: ["deleteUser"],
     mutationFn: deleteUser,
     onSuccess: () => {
-      // Invalidate both queries when deleting
+      // Strategy 1: Invalidate all user queries
       queryClient.invalidateQueries({ queryKey: ["users"] });
+
+      // Strategy 2: Invalidate specific query types
+      if (paginationMode === "infinite") {
+        queryClient.invalidateQueries({ queryKey: ["users", "infinite"] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["users", "pagination"] });
+      }
+
+      // Strategy 3: Invalidate and refetch immediately
+      queryClient.invalidateQueries({
+        queryKey: ["users"],
+        refetchType: "active", // Only refetch active queries
+      });
+
+      setDeletingUserId(null);
+    },
+    onError: () => {
+      setDeletingUserId(null);
     },
   });
 
   const handleDelete = (id: number, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
+      setDeletingUserId(id);
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleInvalidateUsers = () => {
+    // Invalidate all user-related queries
+    queryClient.invalidateQueries({ queryKey: ["users"] });
+  };
+
+  const handleInvalidateCurrentMode = () => {
+    // Invalidate current mode only
+    if (paginationMode === "infinite") {
+      queryClient.invalidateQueries({ queryKey: ["users", "infinite"] });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["users", "pagination"] });
+    }
+  };
+
+  const handleInvalidateAndRefetch = () => {
+    // Invalidate and immediately refetch
+    queryClient.invalidateQueries({
+      queryKey: ["users"],
+      refetchType: "all", // Refetch all matching queries
+    });
+  };
+
+  const handleRemoveQueries = () => {
+    // Remove queries from cache
+    queryClient.removeQueries({ queryKey: ["users"] });
+  };
+
+  const handleResetQueries = () => {
+    // Reset queries to initial state
+    queryClient.resetQueries({ queryKey: ["users"] });
+  };
+
+  // Background refetching controls
+  const handleToggleAutoRefetch = () => {
+    setRefetchInterval((prev) => (prev ? false : 10000)); // 10 seconds
+  };
+
+  const handleSetRefetchInterval = (interval: number) => {
+    setRefetchInterval(interval);
   };
 
   // Intersection Observer for infinite scrolling
@@ -202,6 +268,11 @@ export default function UsersList() {
                     users.length
                   } users)`}
             </p>
+            {refetchInterval && (
+              <p className="text-sm text-blue-600 mt-1">
+                Auto-refreshing every {refetchInterval / 1000}s
+              </p>
+            )}
           </div>
         </div>
 
@@ -211,7 +282,7 @@ export default function UsersList() {
             <button
               onClick={() => {
                 setPaginationMode("infinite");
-                setCurrentPage(0); // Reset page when switching modes
+                setCurrentPage(0);
               }}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 paginationMode === "infinite"
@@ -224,7 +295,7 @@ export default function UsersList() {
             <button
               onClick={() => {
                 setPaginationMode("pagination");
-                setCurrentPage(0); // Reset page when switching modes
+                setCurrentPage(0);
               }}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 paginationMode === "pagination"
@@ -309,6 +380,92 @@ export default function UsersList() {
         </div>
       </div>
 
+      {/* Query Management Controls */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">
+          Query Management
+        </h3>
+
+        {/* Background Refetching Controls */}
+        <div className="mb-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Background Refetching
+          </h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleToggleAutoRefetch}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                refetchInterval
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              {refetchInterval ? "Stop Auto-Refresh" : "Start Auto-Refresh"}
+            </button>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleSetRefetchInterval(5000)}
+                className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded"
+              >
+                5s
+              </button>
+              <button
+                onClick={() => handleSetRefetchInterval(10000)}
+                className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded"
+              >
+                10s
+              </button>
+              <button
+                onClick={() => handleSetRefetchInterval(30000)}
+                className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded"
+              >
+                30s
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Query Invalidation Controls */}
+        <div>
+          <h4 className="text-sm font-medium text-gray-700 mb-2">
+            Query Invalidation Strategies
+          </h4>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleInvalidateUsers}
+              className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Invalidate Users
+            </button>
+            <button
+              onClick={handleInvalidateCurrentMode}
+              className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Invalidate Current Mode
+            </button>
+            <button
+              onClick={handleInvalidateAndRefetch}
+              className="px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Invalidate & Refetch
+            </button>
+            <button
+              onClick={handleRemoveQueries}
+              className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Remove from Cache
+            </button>
+            <button
+              onClick={handleResetQueries}
+              className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              Reset Queries
+            </button>
+          </div>
+        </div>
+      </div>
+
       {users.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,6 +495,7 @@ export default function UsersList() {
           {users.map((user: any, index: number) => {
             const isLastUser = index === users.length - 1;
             const shouldObserve = paginationMode === "infinite" && isLastUser;
+            const isDeleting = deletingUserId === user.id;
 
             return (
               <div
@@ -364,11 +522,11 @@ export default function UsersList() {
                 </Link>
                 <button
                   onClick={() => handleDelete(user.id, user.firstName)}
-                  disabled={deleteMutation.isPending}
+                  disabled={isDeleting}
                   className="ml-4 p-3 text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 group-hover:bg-red-100"
                   title="Delete user"
                 >
-                  {deleteMutation.isPending ? (
+                  {isDeleting ? (
                     <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     <svg
