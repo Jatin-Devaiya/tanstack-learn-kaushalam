@@ -1,17 +1,38 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { fetchUsers, deleteUser } from "@/api/users";
 import Link from "next/link";
+import { useRef, useCallback } from "react";
 
 export default function UsersList() {
   const queryClient = useQueryClient();
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ["users"],
-    queryFn: fetchUsers,
+    queryFn: ({ pageParam = 0 }) => fetchUsers(10, pageParam),
+    getNextPageParam: (lastPage, allPages) => {
+      // Check if there are more users to fetch
+      const totalFetched = allPages.length * 10;
+      return totalFetched < lastPage.total ? totalFetched : undefined;
+    },
+    initialPageParam: 0,
   });
-  console.log(data);
+
   const deleteMutation = useMutation({
     mutationKey: ["deleteUser"],
     mutationFn: deleteUser,
@@ -25,6 +46,25 @@ export default function UsersList() {
       deleteMutation.mutate(id);
     }
   };
+
+  // Intersection Observer for infinite scrolling
+  const lastUserElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isLoading) return;
+      if (observerRef.current) observerRef.current.disconnect();
+      observerRef.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      });
+      if (node) observerRef.current.observe(node);
+    },
+    [isLoading, hasNextPage, isFetchingNextPage, fetchNextPage]
+  );
+
+  // Flatten all pages data
+  const allUsers = data?.pages.flatMap((page) => page.users) || [];
+  const totalUsers = data?.pages[0]?.total || 0;
 
   if (isLoading) {
     return (
@@ -110,7 +150,7 @@ export default function UsersList() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Users List</h2>
             <p className="text-gray-600">
-              {data?.users?.length || 0} users found
+              {allUsers.length} of {totalUsers} users loaded
             </p>
           </div>
         </div>
@@ -135,7 +175,7 @@ export default function UsersList() {
         </button>
       </div>
 
-      {!data || data.users.length === 0 ? (
+      {allUsers.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -161,54 +201,92 @@ export default function UsersList() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {data.users.map((user: any) => (
-            <div
-              key={user.id}
-              className="flex items-center justify-between p-6 border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
-            >
-              <Link
-                href={`/user/${user.id}`}
-                className="flex-1 hover:text-blue-600 transition-colors"
+          {allUsers.map((user: any, index: number) => {
+            const isLastUser = index === allUsers.length - 1;
+            return (
+              <div
+                key={user.id}
+                ref={isLastUser ? lastUserElementRef : null}
+                className="flex items-center justify-between p-6 border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
               >
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                    {user.firstName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 text-lg">
-                      {user.firstName} {user.lastName}
+                <Link
+                  href={`/user/${user.id}`}
+                  className="flex-1 hover:text-blue-600 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      {user.firstName.charAt(0).toUpperCase()}
                     </div>
-                    <div className="text-gray-600">{user.email}</div>
-                    <div className="text-sm text-gray-500">ID: {user.id}</div>
+                    <div>
+                      <div className="font-semibold text-gray-900 text-lg">
+                        {user.firstName} {user.lastName}
+                      </div>
+                      <div className="text-gray-600">{user.email}</div>
+                      <div className="text-sm text-gray-500">ID: {user.id}</div>
+                    </div>
                   </div>
-                </div>
-              </Link>
-              <button
-                onClick={() => handleDelete(user.id, user.firstName)}
-                disabled={deleteMutation.isPending}
-                className="ml-4 p-3 text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 group-hover:bg-red-100"
-                title="Delete user"
-              >
-                {deleteMutation.isPending ? (
-                  <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
-          ))}
+                </Link>
+                <button
+                  onClick={() => handleDelete(user.id, user.firstName)}
+                  disabled={deleteMutation.isPending}
+                  className="ml-4 p-3 text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 group-hover:bg-red-100"
+                  title="Delete user"
+                >
+                  {deleteMutation.isPending ? (
+                    <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Loading indicator for infinite scroll */}
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-8">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-gray-600 font-medium">
+              Loading more users...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* End of list indicator */}
+      {!hasNextPage && allUsers.length > 0 && (
+        <div className="text-center py-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-gray-600 text-sm">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            All users loaded
+          </div>
         </div>
       )}
     </div>

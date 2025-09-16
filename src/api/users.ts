@@ -1,6 +1,8 @@
-// get all users
-export async function fetchUsers() {
-  const res = await fetch("https://dummyjson.com/users");
+// get all users with pagination support
+export async function fetchUsers(limit: number = 10, skip: number = 0) {
+  const res = await fetch(
+    `https://dummyjson.com/users?limit=${limit}&skip=${skip}`
+  );
   if (!res.ok) throw new Error("Failed to fetch users");
   return res.json();
 }
