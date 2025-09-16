@@ -2,45 +2,62 @@
 
 import {
   useInfiniteQuery,
+  useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
 import { fetchUsers, deleteUser } from "@/api/users";
 import Link from "next/link";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 
 export default function UsersList() {
   const queryClient = useQueryClient();
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [paginationMode, setPaginationMode] = useState<
+    "infinite" | "pagination"
+  >("infinite");
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    refetch,
-  } = useInfiniteQuery({
-    queryKey: ["users"],
+  // Infinite query for infinite scroll mode
+  const infiniteQuery = useInfiniteQuery({
+    queryKey: ["users", "infinite"],
     queryFn: ({ pageParam = 0 }) => fetchUsers(10, pageParam),
     getNextPageParam: (lastPage, allPages) => {
-      // Check if there are more users to fetch
       const totalFetched = allPages.length * 10;
       return totalFetched < lastPage.total ? totalFetched : undefined;
     },
     initialPageParam: 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes - cache is kept in memory for 10 minutes
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    refetchOnMount: false, // Don't refetch when component mounts if data exists
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    enabled: paginationMode === "infinite", // Only run when in infinite mode
   });
+
+  // Regular query for pagination mode
+  const paginationQuery = useQuery({
+    queryKey: ["users", "pagination", currentPage],
+    queryFn: () => fetchUsers(10, currentPage * 10),
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    enabled: paginationMode === "pagination", // Only run when in pagination mode
+  });
+
+  // Use the appropriate query based on mode
+  const activeQuery =
+    paginationMode === "infinite" ? infiniteQuery : paginationQuery;
+  const { data, isLoading, isError, error, refetch } = activeQuery;
+
+  // Additional properties for infinite mode
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = infiniteQuery;
 
   const deleteMutation = useMutation({
     mutationKey: ["deleteUser"],
     mutationFn: deleteUser,
     onSuccess: () => {
+      // Invalidate both queries when deleting
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },
   });
@@ -54,7 +71,7 @@ export default function UsersList() {
   // Intersection Observer for infinite scrolling
   const lastUserElementRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isLoading) return;
+      if (isLoading || paginationMode === "pagination") return;
       if (observerRef.current) observerRef.current.disconnect();
       observerRef.current = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
@@ -63,12 +80,37 @@ export default function UsersList() {
       });
       if (node) observerRef.current.observe(node);
     },
-    [isLoading, hasNextPage, isFetchingNextPage, fetchNextPage]
+    [isLoading, hasNextPage, isFetchingNextPage, fetchNextPage, paginationMode]
   );
 
-  // Flatten all pages data
-  const allUsers = data?.pages.flatMap((page) => page.users) || [];
-  const totalUsers = data?.pages[0]?.total || 0;
+  // Get users based on mode
+  const getUsers = () => {
+    if (paginationMode === "infinite") {
+      return data?.pages?.flatMap((page: any) => page.users) || [];
+    } else {
+      return data?.users || [];
+    }
+  };
+
+  const users = getUsers();
+  const totalUsers =
+    paginationMode === "infinite"
+      ? data?.pages?.[0]?.total || 0
+      : data?.total || 0;
+  const totalPages = Math.ceil(totalUsers / 10);
+
+  // Pagination logic
+  const handlePreviousPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -154,32 +196,120 @@ export default function UsersList() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Users List</h2>
             <p className="text-gray-600">
-              {allUsers.length} of {totalUsers} users loaded
+              {paginationMode === "infinite"
+                ? `${users.length} of ${totalUsers} users loaded`
+                : `Page ${currentPage + 1} of ${totalPages} (${
+                    users.length
+                  } users)`}
             </p>
           </div>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+
+        <div className="flex items-center gap-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setPaginationMode("infinite");
+                setCurrentPage(0); // Reset page when switching modes
+              }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                paginationMode === "infinite"
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Infinite Scroll
+            </button>
+            <button
+              onClick={() => {
+                setPaginationMode("pagination");
+                setCurrentPage(0); // Reset page when switching modes
+              }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                paginationMode === "pagination"
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Pagination
+            </button>
+          </div>
+
+          {/* Pagination Controls */}
+          {paginationMode === "pagination" && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 0}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-700 rounded-lg font-medium transition-all duration-200 flex items-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+                Previous
+              </button>
+
+              <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium">
+                {currentPage + 1} / {totalPages}
+              </span>
+
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages - 1}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-700 rounded-lg font-medium transition-all duration-200 flex items-center gap-2"
+              >
+                Next
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() => refetch()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Refresh
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {allUsers.length === 0 ? (
+      {users.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
@@ -205,12 +335,14 @@ export default function UsersList() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {allUsers.map((user: any, index: number) => {
-            const isLastUser = index === allUsers.length - 1;
+          {users.map((user: any, index: number) => {
+            const isLastUser = index === users.length - 1;
+            const shouldObserve = paginationMode === "infinite" && isLastUser;
+
             return (
               <div
                 key={user.id}
-                ref={isLastUser ? lastUserElementRef : null}
+                ref={shouldObserve ? lastUserElementRef : null}
                 className="flex items-center justify-between p-6 border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-200 group"
               >
                 <Link
@@ -261,7 +393,7 @@ export default function UsersList() {
       )}
 
       {/* Loading indicator for infinite scroll */}
-      {isFetchingNextPage && (
+      {paginationMode === "infinite" && isFetchingNextPage && (
         <div className="flex justify-center py-8">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -272,8 +404,8 @@ export default function UsersList() {
         </div>
       )}
 
-      {/* End of list indicator */}
-      {!hasNextPage && allUsers.length > 0 && (
+      {/* End of list indicator for infinite scroll */}
+      {paginationMode === "infinite" && !hasNextPage && users.length > 0 && (
         <div className="text-center py-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-gray-600 text-sm">
             <svg
