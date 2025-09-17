@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useInfiniteQuery,
@@ -21,9 +21,9 @@ export default function UsersList() {
   const [refetchInterval, setRefetchInterval] = useState<number | false>(false);
 
   // Infinite query for infinite scroll mode
-  const infiniteQuery = useInfiniteQuery({
+  const infiniteQuery = useInfiniteQuery<any>({
     queryKey: ["users", "infinite"],
-    queryFn: ({ pageParam = 0 }) => fetchUsers(10, pageParam),
+    queryFn: ({ pageParam = 0 }) => fetchUsers(10, pageParam as number),
     getNextPageParam: (lastPage, allPages) => {
       const totalFetched = allPages.length * 10;
       return totalFetched < lastPage.total ? totalFetched : undefined;
@@ -31,10 +31,10 @@ export default function UsersList() {
     initialPageParam: 0,
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: true, // Enable refetch on window focus
-    refetchOnMount: true, // Enable refetch on mount
-    refetchInterval: refetchInterval, // Automatic background refetching
-    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: refetchInterval,
+    refetchIntervalInBackground: false,
     enabled: paginationMode === "infinite",
   });
 
@@ -44,17 +44,17 @@ export default function UsersList() {
     queryFn: () => fetchUsers(10, currentPage * 10),
     staleTime: 30 * 1000,
     gcTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: true, // Enable refetch on window focus
-    refetchOnMount: true, // Enable refetch on mount
-    refetchInterval: refetchInterval, // Automatic background refetching
-    refetchIntervalInBackground: false, // Don't refetch when tab is not active
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: refetchInterval,
+    refetchIntervalInBackground: false,
     enabled: paginationMode === "pagination",
   });
 
   // Use the appropriate query based on mode
   const activeQuery =
     paginationMode === "infinite" ? infiniteQuery : paginationQuery;
-  const { data, isLoading, isError, error, refetch } = activeQuery;
+  const { data, isLoading, isError, error, refetch } = activeQuery as any;
 
   // Additional properties for infinite mode
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = infiniteQuery;
@@ -63,22 +63,16 @@ export default function UsersList() {
     mutationKey: ["deleteUser"],
     mutationFn: deleteUser,
     onSuccess: () => {
-      // Strategy 1: Invalidate all user queries
       queryClient.invalidateQueries({ queryKey: ["users"] });
-
-      // Strategy 2: Invalidate specific query types
       if (paginationMode === "infinite") {
         queryClient.invalidateQueries({ queryKey: ["users", "infinite"] });
       } else {
         queryClient.invalidateQueries({ queryKey: ["users", "pagination"] });
       }
-
-      // Strategy 3: Invalidate and refetch immediately
       queryClient.invalidateQueries({
         queryKey: ["users"],
-        refetchType: "active", // Only refetch active queries
+        refetchType: "active",
       });
-
       setDeletingUserId(null);
     },
     onError: () => {
@@ -94,12 +88,10 @@ export default function UsersList() {
   };
 
   const handleInvalidateUsers = () => {
-    // Invalidate all user-related queries
     queryClient.invalidateQueries({ queryKey: ["users"] });
   };
 
   const handleInvalidateCurrentMode = () => {
-    // Invalidate current mode only
     if (paginationMode === "infinite") {
       queryClient.invalidateQueries({ queryKey: ["users", "infinite"] });
     } else {
@@ -108,26 +100,22 @@ export default function UsersList() {
   };
 
   const handleInvalidateAndRefetch = () => {
-    // Invalidate and immediately refetch
     queryClient.invalidateQueries({
       queryKey: ["users"],
-      refetchType: "all", // Refetch all matching queries
+      refetchType: "all",
     });
   };
 
   const handleRemoveQueries = () => {
-    // Remove queries from cache
     queryClient.removeQueries({ queryKey: ["users"] });
   };
 
   const handleResetQueries = () => {
-    // Reset queries to initial state
     queryClient.resetQueries({ queryKey: ["users"] });
   };
 
-  // Background refetching controls
   const handleToggleAutoRefetch = () => {
-    setRefetchInterval((prev) => (prev ? false : 10000)); // 10 seconds
+    setRefetchInterval((prev) => (prev ? false : 10000));
   };
 
   const handleSetRefetchInterval = (interval: number) => {
@@ -215,7 +203,9 @@ export default function UsersList() {
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
             Error Loading Users
           </h3>
-          <p className="text-gray-600 mb-6">{(error as Error).message}</p>
+          <p className="text-gray-600 mb-6">
+            {error?.message || "An error occurred"}
+          </p>
           <button
             onClick={() => refetch()}
             className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 mx-auto"
@@ -509,7 +499,7 @@ export default function UsersList() {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                      {user.firstName.charAt(0).toUpperCase()}
+                      {user.firstName?.charAt(0)?.toUpperCase() || "U"}
                     </div>
                     <div>
                       <div className="font-semibold text-gray-900 text-lg">
