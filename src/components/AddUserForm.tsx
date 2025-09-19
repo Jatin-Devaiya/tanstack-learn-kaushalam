@@ -26,7 +26,11 @@ export default function AddUserForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && email.trim()) {
-      mutation.mutate({ name: name.trim(), email: email.trim() });
+      mutation.mutate({
+        firstName: name.trim(),
+        lastName: "",
+        email: email.trim(),
+      });
     }
   };
 

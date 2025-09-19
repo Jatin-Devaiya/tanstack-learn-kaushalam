@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import { Suspense, lazy } from "react";
-import ErrorBoundary from "./ErrorBoundary";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy load components for Suspense demo
-const LazyUserProfile = lazy(() => import("./LazyUserProfile"));
-const LazyPostsList = lazy(() => import("./LazyPostsList"));
+const LazyUserProfile = lazy(() => import("@/components/LazyUserProfile"));
+const LazyPostsList = lazy(() => import("@/components/LazyPostsList"));
 
 // Loading fallback component
 function LoadingFallback({ message = "Loading..." }: { message?: string }) {
