@@ -48,11 +48,7 @@ export interface ApiResponse<T> {
 
 // Enhanced error class for better error handling
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public endpoint: string
-  ) {
+  constructor(message: string, public status: number, public endpoint: string) {
     super(message);
     this.name = "ApiError";
   }
@@ -83,7 +79,9 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
       throw error;
     }
     throw new ApiError(
-      `Network error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      `Network error: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
       0,
       url
     );
@@ -91,7 +89,10 @@ async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 // User API functions
-export async function fetchUsers(limit: number = 10, skip: number = 0): Promise<{
+export async function fetchUsers(
+  limit: number = 10,
+  skip: number = 0
+): Promise<{
   users: User[];
   total: number;
   skip: number;
@@ -104,9 +105,9 @@ export async function getUserById(id: number): Promise<User> {
   return apiRequest(`https://dummyjson.com/users/${id}`);
 }
 
-export async function addUser(newUser: { 
-  firstName: string; 
-  lastName: string; 
+export async function addUser(newUser: {
+  firstName: string;
+  lastName: string;
   email: string;
   age?: number;
 }): Promise<User> {
@@ -126,14 +127,19 @@ export async function updateUser(
   });
 }
 
-export async function deleteUser(id: number): Promise<{ id: number; isDeleted: boolean }> {
+export async function deleteUser(
+  id: number
+): Promise<{ id: number; isDeleted: boolean }> {
   return apiRequest(`https://dummyjson.com/users/${id}`, {
     method: "DELETE",
   });
 }
 
 // Posts API functions
-export async function fetchPosts(limit: number = 10, skip: number = 0): Promise<{
+export async function fetchPosts(
+  limit: number = 10,
+  skip: number = 0
+): Promise<{
   posts: Post[];
   total: number;
   skip: number;
@@ -168,12 +174,12 @@ export async function fetchUserWithPosts(userId: number): Promise<{
 }> {
   const [user, postsData] = await Promise.all([
     getUserById(userId),
-    fetchUserPosts(userId)
+    fetchUserPosts(userId),
   ]);
-  
+
   return {
     user,
-    posts: postsData.posts
+    posts: postsData.posts,
   };
 }
 
@@ -182,12 +188,16 @@ export async function searchUsers(query: string): Promise<{
   users: User[];
   total: number;
 }> {
-  return apiRequest(`https://dummyjson.com/users/search?q=${encodeURIComponent(query)}`);
+  return apiRequest(
+    `https://dummyjson.com/users/search?q=${encodeURIComponent(query)}`
+  );
 }
 
 export async function searchPosts(query: string): Promise<{
   posts: Post[];
   total: number;
 }> {
-  return apiRequest(`https://dummyjson.com/posts/search?q=${encodeURIComponent(query)}`);
+  return apiRequest(
+    `https://dummyjson.com/posts/search?q=${encodeURIComponent(query)}`
+  );
 }

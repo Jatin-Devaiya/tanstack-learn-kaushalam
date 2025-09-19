@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useOptimisticUserUpdate, useUser } from "@/hooks/useUsers";
-import { User } from "@/api/users";
 
 interface OptimisticUpdateDemoProps {
   userId: number;
 }
 
-export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoProps) {
+export default function OptimisticUpdateDemo({
+  userId,
+}: OptimisticUpdateDemoProps) {
   const { data: user, isLoading } = useUser(userId);
   const optimisticUpdate = useOptimisticUserUpdate();
   const [isEditing, setIsEditing] = useState(false);
@@ -68,7 +69,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
         <div className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center">
             <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <span className="text-gray-600 text-lg font-medium">Loading user...</span>
+            <span className="text-gray-600 text-lg font-medium">
+              Loading user...
+            </span>
           </div>
         </div>
       </div>
@@ -104,15 +107,21 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
           </svg>
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Optimistic Updates Demo</h2>
-          <p className="text-gray-600">See instant UI updates before server confirmation</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Optimistic Updates Demo
+          </h2>
+          <p className="text-gray-600">
+            See instant UI updates before server confirmation
+          </p>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Current User Info */}
         <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Current User Info</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Current User Info
+          </h3>
           <div className="space-y-3">
             <div className="flex items-center">
               <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-white font-bold text-xl mr-4">
@@ -132,7 +141,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
         {/* Edit Form */}
         {isEditing ? (
           <div className="bg-blue-50 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit User (Optimistic Update)</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Edit User (Optimistic Update)
+            </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -141,7 +152,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
                 <input
                   type="text"
                   value={editForm.firstName}
-                  onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, firstName: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -152,7 +165,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
                 <input
                   type="text"
                   value={editForm.lastName}
-                  onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, lastName: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -163,7 +178,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
                 <input
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -231,8 +248,18 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
         {optimisticUpdate.isError && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-5 h-5 text-red-600 mr-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
               <span className="text-red-800 font-medium">
                 Update failed. Changes have been reverted.
@@ -244,8 +271,18 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
         {optimisticUpdate.isSuccess && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center">
-              <svg className="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-5 h-5 text-green-600 mr-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
               <span className="text-green-800 font-medium">
                 User updated successfully!
@@ -256,7 +293,9 @@ export default function OptimisticUpdateDemo({ userId }: OptimisticUpdateDemoPro
 
         {/* Explanation */}
         <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-semibold text-gray-900 mb-2">How Optimistic Updates Work:</h4>
+          <h4 className="font-semibold text-gray-900 mb-2">
+            How Optimistic Updates Work:
+          </h4>
           <ul className="text-sm text-gray-600 space-y-1">
             <li> UI updates immediately when you click "Save Changes"</li>
             <li> The actual API call happens in the background</li>
